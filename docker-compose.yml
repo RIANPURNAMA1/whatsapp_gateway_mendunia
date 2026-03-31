@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Database Service
+  db:
+    image: mysql:8.0
+    container_name: wa-blast-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: wa_blast_db
+      MYSQL_ROOT_PASSWORD: yourpassword # Disarankan tetap isi password meski lokal
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./backend/database.sql:/docker-entrypoint-initdb.d/setup.sql
+
+  # Backend Service
+  backend:
+    build: ./backend
+    container_name: wa-blast-backend
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=wa_blast_db
+      - DB_USER=root
+      - DB_PASSWORD=yourpassword
+      - JWT_SECRET=ganti_dengan_string_random_panjang
+      - FRONTEND_URL=http://localhost:5173
+      - SESSIONS_DIR=./sessions
+    volumes:
+      - ./backend:/app             # Mirroring folder backend agar otomatis update
+      - /app/node_modules          # Cegah node_modules lokal menimpa container
+      - ./backend/sessions:/app/sessions
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - db
+
+  # Frontend Service
+  frontend:
+    build: ./frontend
+    container_name: wa-blast-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+      - CHOKIDAR_USEPOLLING=true    # Penting agar Hot Reload jalan di Windows/Docker
+    volumes:
+      - ./frontend:/app            # Mirroring folder frontend agar otomatis update
+      - /app/node_modules          # Cegah node_modules lokal menimpa container
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
