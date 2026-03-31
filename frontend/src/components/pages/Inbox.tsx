@@ -9,6 +9,7 @@ import { Input, Badge } from '@/components/ui/elements'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 import toast from 'react-hot-toast'
+import { useSocket } from '@/hooks/useSocket'
 
 interface MessageLog {
   id: number
@@ -30,6 +31,7 @@ export default function MessageLogPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const socket = useSocket()
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -49,6 +51,29 @@ export default function MessageLogPage() {
   useEffect(() => {
     fetchLogs()
   }, [fetchLogs])
+
+  useEffect(() => {
+    if (!socket) return
+    const handleIncoming = (data: { from: string; from_name: string; content: string; timestamp: string }) => {
+      setLogs(prev => {
+        const newLog: MessageLog = {
+          id: Date.now(),
+          session_id: data.sessionId || 0,
+          direction: 'incoming',
+          from_number: data.from,
+          from_name: data.from_name || data.from,
+          to_number: '',
+          message_type: 'text',
+          content: data.content,
+          createdAt: data.timestamp,
+          is_read: 0,
+        }
+        return [newLog, ...prev]
+      })
+    }
+    socket.on('incoming_message', handleIncoming)
+    return () => { socket.off('incoming_message', handleIncoming) }
+  }, [socket])
 
   // --- Fungsi Format Nomor HP ---
   const formatNumber = (raw: string) => {

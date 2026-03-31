@@ -33,21 +33,32 @@ router.post('/login', async (req, res) => {
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  console.log("--- REQUEST REGISTER MASUK ---");
+  console.log("Data Body:", req.body);
+
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password)
-      return res.status(400).json({ success: false, message: 'All fields required' });
-
+    
+    console.log("Mengecek email...");
     const exists = await User.findOne({ where: { email } });
-    if (exists) return res.status(400).json({ success: false, message: 'Email already registered' });
+    
+    if (exists) {
+      console.log("Email sudah ada");
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
 
+    console.log("Mencoba membuat user...");
     const user = await User.create({ name, email, password });
+    
+    console.log("User berhasil dibuat!");
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (e) {
+    console.error("!!! ERROR REGISTER !!!");
+    console.error(e); // Ini akan memunculkan detail error di terminal
     res.status(500).json({ success: false, message: e.message });
   }
 });

@@ -10,6 +10,8 @@ const MessageTemplate = sequelize.define('MessageTemplate', {
   media_type: { type: DataTypes.ENUM('none','image','video','document'), defaultValue: 'none' },
   media_url: { type: DataTypes.STRING(500), defaultValue: null },
   variables: { type: DataTypes.JSON, defaultValue: null },
+  is_schedule: { type: DataTypes.TINYINT(1), defaultValue: 0 },
+  schedule_time: { type: DataTypes.DATE, defaultValue: null },
 }, { 
   tableName: 'message_templates',
   underscored: true // Mengikuti standar database (created_at)
@@ -38,6 +40,7 @@ const MessageLog = sequelize.define('MessageLog', {
   session_id: { type: DataTypes.INTEGER, allowNull: false },
   direction: { type: DataTypes.ENUM('incoming','outgoing'), allowNull: false },
   from_number: { type: DataTypes.STRING(20), allowNull: false },
+  from_name: { type: DataTypes.STRING(100), defaultValue: null },
   to_number: { type: DataTypes.STRING(20), allowNull: false },
   message_type: { type: DataTypes.ENUM('text','image','video','document','audio','sticker'), defaultValue: 'text' },
   content: { type: DataTypes.TEXT, defaultValue: null },

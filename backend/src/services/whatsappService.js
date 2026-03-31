@@ -166,7 +166,7 @@ sock.ev.on('messages.upsert', async ({ messages, type }) => {
     io.to(`user_${userId}`).emit('incoming_message', {
       sessionId,
       from: fromNumber,
-      from_name: senderName, // DIKIRIM KE FRONTEND
+      from_name: senderName,
       content,
       timestamp: new Date(),
     });

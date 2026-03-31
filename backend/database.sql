@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS message_logs (
   session_id INT NOT NULL,
   direction ENUM('incoming', 'outgoing') NOT NULL,
   from_number VARCHAR(20) NOT NULL,
+  from_name VARCHAR(100) DEFAULT NULL,
   to_number VARCHAR(20) NOT NULL,
   message_type ENUM('text', 'image', 'video', 'document', 'audio', 'sticker') DEFAULT 'text',
   content TEXT DEFAULT NULL,
@@ -146,6 +147,32 @@ CREATE TABLE IF NOT EXISTS message_logs (
   is_read TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (session_id) REFERENCES wa_sessions(id) ON DELETE CASCADE
+);
+
+-- API Keys untuk akses publik
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  key_value VARCHAR(64) NOT NULL UNIQUE,
+  name VARCHAR(100) DEFAULT NULL,
+  is_active TINYINT(1) DEFAULT 1,
+  last_used DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- External API Connections (untuk integrasi dengan sistem lain)
+CREATE TABLE IF NOT EXISTS external_connections (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  api_url VARCHAR(255) NOT NULL,
+  api_token VARCHAR(255) NOT NULL,
+  device_id VARCHAR(50) DEFAULT NULL,
+  is_active TINYINT(1) DEFAULT 1,
+  last_connected DATETIME DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Default admin user (password: admin123)

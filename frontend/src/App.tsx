@@ -12,6 +12,8 @@ import BlastPage from './components/pages/BlastPage'
 import { TemplatesPage, AutoReplyPage } from './components/pages/TemplatesPage'
 import { Inbox } from 'lucide-react'
 import InboxView from './components/pages/Inbox'
+import ApiKeysPage from './components/pages/ApiKeysPage'
+import ExternalConnectionsPage from './components/pages/ExternalConnectionsPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -62,6 +64,8 @@ export default function App() {
           <Route path="inbox" element={<InboxView />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="auto-reply" element={<AutoReplyPage />} />
+          <Route path="api-keys" element={<ApiKeysPage />} />
+          <Route path="external" element={<ExternalConnectionsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -1,34 +1,58 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt'); // atau 'bcryptjs'
 
-// 1. DEFINE DULU
 const User = sequelize.define('User', {
-  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  name: { type: DataTypes.STRING(100), allowNull: false },
-  email: { type: DataTypes.STRING(150), allowNull: false, unique: true },
-  password: { type: DataTypes.STRING(255), allowNull: false },
-  role: { type: DataTypes.ENUM('admin', 'user'), defaultValue: 'user' },
-  is_active: { type: DataTypes.TINYINT(1), defaultValue: 1 },
+  id: { 
+    type: DataTypes.INTEGER, 
+    primaryKey: true, 
+    autoIncrement: true 
+  },
+  name: { 
+    type: DataTypes.STRING(100), 
+    allowNull: false 
+  },
+  email: { 
+    type: DataTypes.STRING(150), 
+    allowNull: false, 
+    unique: true,
+    validate: { isEmail: true } // Tambahan validasi format email
+  },
+  password: { 
+    type: DataTypes.STRING(255), 
+    allowNull: false 
+  },
+  role: { 
+    type: DataTypes.ENUM('admin', 'user'), 
+    defaultValue: 'user' 
+  },
+  is_active: { 
+    type: DataTypes.BOOLEAN, // Gunakan BOOLEAN agar lebih standar Sequelize
+    defaultValue: true 
+  },
 }, {
   tableName: 'users',
-});
-
-// 2. BARU TAMBAHKAN HOOK
-User.beforeCreate(async (user) => {
-  user.password = await bcrypt.hash(user.password, 10);
-});
-
-User.beforeUpdate(async (user) => {
-  if (user.changed('password')) {
-    user.password = await bcrypt.hash(user.password, 10);
+  timestamps: true, // Sangat disarankan untuk audit data (createdAt, updatedAt)
+  hooks: {
+    // Hooks diletakkan di sini lebih aman
+    beforeCreate: async (user) => {
+      if (user.password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+    },
+    beforeUpdate: async (user) => {
+      if (user.changed('password')) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+    }
   }
 });
 
-// 3. METHOD
+// Instance Method
 User.prototype.comparePassword = async function (pwd) {
   return await bcrypt.compare(pwd, this.password);
 };
 
-// 4. EXPORT
 module.exports = User;

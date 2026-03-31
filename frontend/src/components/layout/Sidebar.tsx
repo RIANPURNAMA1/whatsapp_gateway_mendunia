@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Zap,
   MessageSquare,
+  Key,
+  Link,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,11 +24,13 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/devices", icon: Smartphone, label: "Perangkat WhatsApp" },
-  { to: "/inbox", icon: MessageSquare, label: "Pesan Masuk" }, // <-- Menu Baru
+  { to: "/inbox", icon: MessageSquare, label: "Pesan Masuk" },
   { to: "/contacts", icon: Users, label: "Kontak" },
   { to: "/blast", icon: Send, label: "Blast Pesan" },
   { to: "/templates", icon: FileText, label: "Template Pesan" },
   { to: "/auto-reply", icon: MessageSquareReply, label: "Auto Reply" },
+  { to: "/api-keys", icon: Key, label: "API Keys" },
+  { to: "/external", icon: Link, label: "Integrasi External" },
 ];
 
 export default function Sidebar() {
@@ -66,7 +70,7 @@ export default function Sidebar() {
           const active =
             location.pathname === to || location.pathname.startsWith(to + "/");
           return (
-            <Link
+            <RouterLink
               key={to}
               to={to}
               onClick={() => setMobileOpen(false)}
@@ -75,7 +79,7 @@ export default function Sidebar() {
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1">{label}</span>
               {active && <ChevronRight className="w-3 h-3 opacity-50" />}
-            </Link>
+            </RouterLink>
           );
         })}
       </nav>

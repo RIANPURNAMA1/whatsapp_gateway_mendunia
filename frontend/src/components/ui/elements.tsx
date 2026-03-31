@@ -1,5 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { ChevronDown, Check } from "lucide-react"
+import * as SelectPrimitive from "@radix-ui/react-select"
 
 // INPUT
 const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
@@ -128,4 +130,54 @@ const Separator = React.forwardRef<
 ))
 Separator.displayName = SeparatorPrimitive.Root.displayName
 
-export { Input, Textarea, Label, Badge, badgeVariants, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Separator }
+// SELECT
+const SelectComponent = SelectPrimitive.Root
+const SelectValueComponent = SelectPrimitive.Value
+const SelectTriggerComponent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Trigger
+    ref={ref}
+    className={cn("flex h-9 w-full items-center justify-between whitespace-nowrap rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50", className)}
+    {...props}
+  >
+    {children}
+    <SelectPrimitive.Icon asChild><ChevronDown className="h-4 w-4 opacity-50" /></SelectPrimitive.Icon>
+  </SelectPrimitive.Trigger>
+))
+SelectTriggerComponent.displayName = SelectPrimitive.Trigger.displayName
+
+const SelectContentComponent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
+>(({ className, children, position = "popper", ...props }, ref) => (
+  <SelectPrimitive.Portal>
+    <SelectPrimitive.Content
+      ref={ref}
+      className={cn("relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md", position === "popper" && "data-[side=bottom]:translate-y-1", className)}
+      position={position}
+      {...props}
+    >
+      <SelectPrimitive.Viewport className={cn("p-1", position === "popper" && "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]")}>
+        {children}
+      </SelectPrimitive.Viewport>
+    </SelectPrimitive.Content>
+  </SelectPrimitive.Portal>
+))
+SelectContentComponent.displayName = SelectPrimitive.Content.displayName
+
+const SelectItemComponent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Item ref={ref} className={cn("relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", className)} {...props}>
+    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+      <SelectPrimitive.ItemIndicator><Check className="h-4 w-4" /></SelectPrimitive.ItemIndicator>
+    </span>
+    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+  </SelectPrimitive.Item>
+))
+SelectItemComponent.displayName = SelectPrimitive.Item.displayName
+
+export { Input, Textarea, Label, Badge, badgeVariants, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Separator, SelectComponent as Select, SelectContentComponent as SelectContent, SelectItemComponent as SelectItem, SelectTriggerComponent as SelectTrigger, SelectValueComponent as SelectValue }
