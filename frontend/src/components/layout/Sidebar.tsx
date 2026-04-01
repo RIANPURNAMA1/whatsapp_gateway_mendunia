@@ -14,8 +14,6 @@ import {
   ChevronRight,
   Zap,
   MessageSquare,
-  Key,
-  Link,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,8 +27,6 @@ const navItems = [
   { to: "/blast", icon: Send, label: "Blast Pesan" },
   { to: "/templates", icon: FileText, label: "Template Pesan" },
   { to: "/auto-reply", icon: MessageSquareReply, label: "Auto Reply" },
-  { to: "/api-keys", icon: Key, label: "API Keys" },
-  { to: "/external", icon: Link, label: "Integrasi External" },
 ];
 
 export default function Sidebar() {

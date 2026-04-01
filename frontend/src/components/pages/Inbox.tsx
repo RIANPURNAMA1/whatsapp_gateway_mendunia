@@ -2,10 +2,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { 
   Search, MessageSquare, Loader2, 
   ChevronLeft, ChevronRight, ArrowDownLeft, 
-  RefreshCcw, Smartphone, User, Phone
+  RefreshCcw, Smartphone, User, Phone, Send
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input, Badge } from '@/components/ui/elements'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/overlay'
+import { Textarea } from '@/components/ui/elements'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 import toast from 'react-hot-toast'
@@ -32,6 +34,12 @@ export default function MessageLogPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const socket = useSocket()
+
+  // Send message state
+  const [sendOpen, setSendOpen] = useState(false)
+  const [sendTo, setSendTo] = useState('')
+  const [sendMessage, setSendMessage] = useState('')
+  const [sending, setSending] = useState(false)
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -81,6 +89,37 @@ export default function MessageLogPage() {
     return `+${clean}`;
   }
 
+  const handleSendMessage = async () => {
+    if (!sendTo.trim() || !sendMessage.trim()) {
+      toast.error('Nomor dan pesan harus diisi')
+      return
+    }
+    setSending(true)
+    try {
+      const sessionsRes = await api.get('/sessions')
+      const connectedSession = sessionsRes.data.data.find((s: any) => s.status === 'connected')
+      
+      if (!connectedSession) {
+        toast.error('Tidak ada perangkat WhatsApp terhubung')
+        setSending(false)
+        return
+      }
+
+      await api.post(`/sessions/${connectedSession.id}/send`, {
+        phone: sendTo.replace(/\D/g, ''),
+        message: sendMessage
+      })
+      toast.success('Pesan terkirim!')
+      setSendOpen(false)
+      setSendTo('')
+      setSendMessage('')
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Gagal mengirim pesan')
+    } finally {
+      setSending(false)
+    }
+  }
+
   // Filter pencarian berdasarkan Nama atau Nomor atau Isi Pesan
   const filteredLogs = logs.filter(log => 
     log.from_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,15 +141,25 @@ export default function MessageLogPage() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Log Pesan Masuk</h1>
           <p className="text-sm text-slate-500 font-medium">Monitoring aktivitas & nama pengirim secara real-time</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={fetchLogs} 
-          disabled={loading}
-          className="bg-white hover:bg-slate-50 border-slate-200 shadow-sm"
-        >
-          <RefreshCcw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
-          Refresh Data
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={fetchLogs} 
+            disabled={loading}
+            className="bg-white hover:bg-slate-50 border-slate-200 shadow-sm"
+          >
+            <RefreshCcw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
+            Refresh Data
+          </Button>
+          <Button 
+            variant="wa"
+            onClick={() => setSendOpen(true)}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Kirim Pesan
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -288,6 +337,49 @@ export default function MessageLogPage() {
           Live Monitoring Active
         </p>
       </div>
+
+      {/* Send Message Dialog */}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-green-600" />
+              Kirim Pesan
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Nomor WhatsApp</label>
+              <Input
+                placeholder="6281234567890"
+                value={sendTo}
+                onChange={e => setSendTo(e.target.value)}
+              />
+              <p className="text-xs text-slate-400">Contoh: 6281234567890</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Pesan</label>
+              <Textarea
+                placeholder="Ketik pesan..."
+                className="min-h-[100px]"
+                value={sendMessage}
+                onChange={e => setSendMessage(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSendOpen(false)}>Batal</Button>
+              <Button 
+                variant="wa" 
+                onClick={handleSendMessage}
+                disabled={sending || !sendTo.trim() || !sendMessage.trim()}
+              >
+                {sending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Kirim
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
