@@ -13,17 +13,17 @@ import api from '@/lib/api'
 import toast from 'react-hot-toast'
 import { useSocket } from '@/hooks/useSocket'
 
-interface MessageLog {
+  interface MessageLog {
   id: number
   session_id: number
-  session_name?: string
   direction: 'incoming' | 'outgoing'
   from_number: string
-  from_name?: string // Field baru dari backend
+  from_name?: string
   to_number: string
   message_type: string
   content: string
-  createdAt: string
+  createdAt?: string
+  created_at?: string
   is_read: number
 }
 
@@ -204,12 +204,18 @@ export default function MessageLogPage() {
                   <tr key={log.id} className="hover:bg-slate-50/80 transition-all group">
                     {/* Kolom Waktu */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-slate-700 font-bold">
-                        {new Date(log.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-bold">
-                        {new Date(log.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                      </div>
+                      {(log.createdAt || log.created_at) ? (
+                        <>
+                          <div className="text-slate-700 font-bold">
+                            {new Date(log.createdAt || log.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-bold">
+                            {new Date(log.createdAt || log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </td>
 
                     {/* Kolom Pengirim (NAMA & NOMOR) */}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Card, CardContent } from '@/components/ui/elements'
@@ -9,8 +9,8 @@ import toast from 'react-hot-toast'
 export default function LoginPage() {
   const { login } = useAuthStore()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('admin@wablast.com')
-  const [password, setPassword] = useState('admin123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -80,18 +80,11 @@ export default function LoginPage() {
                 {loading ? 'Masuk...' : 'Masuk'}
               </Button>
             </form>
-
-            <p className="text-center text-sm text-slate-500 mt-4">
-              Belum punya akun?{' '}
-              <Link to="/register" className="text-green-600 font-semibold hover:underline">
-                Daftar sekarang
-              </Link>
-            </p>
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Default: admin@wablast.com / admin123
+          Hubungi superadmin untuk membuat akun
         </p>
       </div>
     </div>

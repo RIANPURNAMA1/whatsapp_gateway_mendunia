@@ -98,4 +98,22 @@ router.post('/:id/send', auth, async (req, res) => {
   }
 });
 
+// POST /api/sessions/:id/send-single - kirim pesan single ke nomor yang diinputkan
+router.post('/:id/send-single', auth, async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || !message) return res.status(400).json({ success: false, message: 'Nomor dan pesan wajib diisi' });
+
+    const session = await WaSession.findOne({ where: { id: req.params.id, user_id: req.user.id } });
+    if (!session) return res.status(404).json({ success: false, message: 'Session tidak ditemukan' });
+    if (session.status !== 'connected') return res.status(400).json({ success: false, message: 'Session belum terhubung' });
+
+    const { sendMessage } = require('../services/whatsappService');
+    await sendMessage(session.id, phone, message);
+    res.json({ success: true, message: 'Pesan berhasil dikirim', phone });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/elements'
-import { Badge } from '@/components/ui/elements'
-import { Smartphone, Users, Send, MessageSquare, TrendingUp, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Smartphone, Users, Send, MessageSquare, TrendingUp, CheckCircle2, XCircle, Clock, Shield } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import api from '@/lib/api'
 import type { DashboardStats, BlastCampaign } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { useAuthStore } from '@/store/authStore'
 
 const statusColor: Record<string, string> = {
   running: 'bg-blue-100 text-blue-700',
@@ -23,7 +23,9 @@ const statusLabel: Record<string, string> = {
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
+  const [stats, setStats] = useState<DashboardStats & { users?: { total: number }, role?: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -66,6 +68,14 @@ export default function DashboardPage() {
       color: 'text-orange-600',
       bg: 'bg-orange-50',
     },
+    ...(isAdmin && stats.users ? [{
+      title: 'User Aktif',
+      value: stats.users.total,
+      sub: 'user yang aktif',
+      icon: Shield,
+      color: 'text-teal-600',
+      bg: 'bg-teal-50',
+    }] : []),
   ] : []
 
   const chartData = stats?.chart.map(d => ({
@@ -89,8 +99,14 @@ export default function DashboardPage() {
     <div className="space-y-6 page-enter">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-slate-800">Dashboard</h1>
-        <p className="text-sm text-slate-500">Ringkasan aktivitas WhatsApp Blast</p>
+        <h1 className="text-xl font-bold text-slate-800">
+          {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
+        </h1>
+        <p className="text-sm text-slate-500">
+          {isAdmin 
+            ? 'Ringkasan seluruh sistem WhatsApp Blast' 
+            : 'Ringkasan aktivitas WhatsApp Blast Anda'}
+        </p>
       </div>
 
       {/* Stat Cards */}

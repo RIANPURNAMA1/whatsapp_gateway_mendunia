@@ -8,7 +8,11 @@ const auth = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findByPk(decoded.id);
-    if (!user || !user.is_active) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    if (!user.is_active) return res.status(401).json({ success: false, message: 'Account is disabled' });
+
+    if (!user.role) user.role = 'user';
     req.user = user;
     next();
   } catch (e) {

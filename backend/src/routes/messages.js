@@ -91,9 +91,9 @@ router.delete('/auto-reply/:id', auth, async (req, res) => {
  */
 router.get('/inbox/chats', auth, async (req, res) => {
   try {
-    // Ambil semua pesan terbaru milik user yang login
     const logs = await MessageLog.sequelize.query(`
-      SELECT ml.*, ws.session_name 
+      SELECT ml.id, ml.from_number, ml.from_name, ml.to_number, ml.content, ml.direction, ml.session_id, 
+             ws.session_name, ml.created_at as createdAt
       FROM message_logs ml
       JOIN wa_sessions ws ON ml.session_id = ws.id
       WHERE ws.user_id = :userId
@@ -104,7 +104,6 @@ router.get('/inbox/chats', auth, async (req, res) => {
       type: Sequelize.QueryTypes.SELECT
     });
 
-    // Logic Sederhana: Buat daftar chat unik berdasarkan nomor di Javascript saja (lebih stabil)
     const uniqueChats = [];
     const map = new Map();
     for (const item of logs) {

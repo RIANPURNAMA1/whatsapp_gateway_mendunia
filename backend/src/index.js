@@ -17,6 +17,7 @@ const contactRoutes = require('./routes/contacts');
 const blastRoutes = require('./routes/blast');
 const messageRoutes = require('./routes/messages');
 const dashboardRoutes = require('./routes/dashboard');
+const usersRoutes = require('./routes/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -52,6 +53,7 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/blast', blastRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));

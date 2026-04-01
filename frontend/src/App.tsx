@@ -4,14 +4,15 @@ import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './store/authStore'
 import Layout from './components/layout/Layout'
 import LoginPage from './components/pages/LoginPage'
-import RegisterPage from './components/pages/RegisterPage'
 import DashboardPage from './components/pages/DashboardPage'
 import DevicesPage from './components/pages/DevicesPage'
 import ContactsPage from './components/pages/ContactsPage'
 import BlastPage from './components/pages/BlastPage'
+import SendMessagePage from './components/pages/SendMessagePage'
+import UsersPage from './components/pages/UsersPage'
 import { TemplatesPage, AutoReplyPage } from './components/pages/TemplatesPage'
-import { Inbox } from 'lucide-react'
 import InboxView from './components/pages/Inbox'
+import RegisterPage from './components/pages/RegisterPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -53,15 +54,17 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-        <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+<Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="devices" element={<DevicesPage />} />
           <Route path="contacts" element={<ContactsPage />} />
+          <Route path="send" element={<SendMessagePage />} />
           <Route path="blast" element={<BlastPage />} />
           <Route path="inbox" element={<InboxView />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="auto-reply" element={<AutoReplyPage />} />
+          <Route path="users" element={<UsersPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

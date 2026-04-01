@@ -14,51 +14,22 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ where: { email } });
     if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
+    if (!user.is_active) return res.status(401).json({ success: false, message: 'Account is disabled' });
+
     const valid = await user.comparePassword(password);
     if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
+    const userRole = user.role || 'user';
+    const token = jwt.sign({ id: user.id, role: userRole }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     });
 
     res.json({
       success: true,
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: userRole },
     });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
-  console.log("--- REQUEST REGISTER MASUK ---");
-  console.log("Data Body:", req.body);
-
-  try {
-    const { name, email, password } = req.body;
-    
-    console.log("Mengecek email...");
-    const exists = await User.findOne({ where: { email } });
-    
-    if (exists) {
-      console.log("Email sudah ada");
-      return res.status(400).json({ success: false, message: 'Email already registered' });
-    }
-
-    console.log("Mencoba membuat user...");
-    const user = await User.create({ name, email, password });
-    
-    console.log("User berhasil dibuat!");
-    res.status(201).json({
-      success: true,
-      message: 'Account created successfully',
-      user: { id: user.id, name: user.name, email: user.email },
-    });
-  } catch (e) {
-    console.error("!!! ERROR REGISTER !!!");
-    console.error(e); // Ini akan memunculkan detail error di terminal
     res.status(500).json({ success: false, message: e.message });
   }
 });
