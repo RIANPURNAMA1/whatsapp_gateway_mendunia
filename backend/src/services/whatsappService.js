@@ -204,6 +204,22 @@ async function handleAutoReply(sessionId, fromNumber, content, sock) {
   }
 }
 
+// Fungsi Send Message
+async function sendMessage(sessionId, to, text, options = {}) {
+  const sock = activeSessions.get(sessionId);
+  if (!sock) throw new Error(`Session ${sessionId} not connected`);
+
+  const jid = to.includes("@s.whatsapp.net") ? to : `${to}@s.whatsapp.net`;
+  
+  const messageOptions = {
+    text,
+    ...options,
+  };
+
+  const result = await sock.sendMessage(jid, messageOptions);
+  return result;
+}
+
 // Export fungsi lainnya tetap sama
 module.exports = {
   createSession,
@@ -214,4 +230,5 @@ module.exports = {
     for (const s of sessions) createSession(s.id, s.user_id, io);
   },
   activeSessions,
+  sendMessage,
 };
