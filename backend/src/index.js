@@ -21,32 +21,55 @@ const usersRoutes = require('./routes/users');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
-});
 
-// Middleware
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+// --- 1. KONFIGURASI CORS ---
+// Ambil URL Frontend dari .env (Contoh: https://wablast.mendunia.id)
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+const corsOptions = {
+  origin: FRONTEND_URL,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+};
+
+// --- 2. MIDDLEWARE (URUTAN SANGAT PENTING) ---
+
+// A. CORS harus paling atas agar Preflight Request (OPTIONS) diizinkan
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle semua request OPTIONS
+
+// B. Helmet untuk keamanan (CSP dimatikan agar Socket.io lancar)
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// C. Body Parser
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Static uploads
-const uploadsDir = path.resolve('./uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/uploads', express.static(uploadsDir));
+// D. Debug Log
+console.log('-------------------------------------------');
+console.log('🚀 WA BLAST BACKEND STARTING...');
+console.log('DEBUG: FRONTEND_URL is', FRONTEND_URL);
+console.log('DEBUG: PORT is', process.env.PORT || 3002);
+console.log('-------------------------------------------');
+
+// --- 3. SOCKET.IO SETUP ---
+const io = new Server(server, {
+  cors: corsOptions // Gunakan opsi CORS yang sama dengan Express
+});
 
 // Make io accessible in routes
 app.set('io', io);
 
-// Routes
+// --- 4. STATIC ASSETS ---
+const uploadsDir = path.resolve('./uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+
+// --- 5. ROUTES ---
 app.use('/api/auth', authRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/contacts', contactRoutes);
@@ -56,19 +79,19 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', usersRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+app.get('/api/health', (req, res) => res.json({ 
+  status: 'ok', 
+  timestamp: new Date(),
+  env: process.env.NODE_ENV || 'development'
+}));
 
-// Socket.IO
+// --- 6. SOCKET.IO EVENTS ---
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  console.log('New socket client connected:', socket.id);
 
   socket.on('join_user', (userId) => {
     socket.join(`user_${userId}`);
-    console.log(`Socket ${socket.id} joined user_${userId}`);
-  });
-
-  socket.on('join_campaign', (campaignId) => {
-    socket.join(`campaign_${campaignId}`);
+    console.log(`Socket ${socket.id} joined room: user_${userId}`);
   });
 
   socket.on('disconnect', () => {
@@ -76,22 +99,21 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+// --- 7. DATABASE & SERVER START ---
+const PORT = process.env.PORT || 3002;
 
-// Sync DB and start server
-sequelize.authenticate()
-  .then(() => {
-    console.log('✅ Database connected');
-    return sequelize.sync({ alter: false });
-  })
-  .then(async () => {
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      // Restore active WhatsApp sessions
-      restoreActiveSessions(io).catch(console.error);
-    });
-  })
-  .catch((err) => {
-    console.error('❌ Database connection failed:', err.message);
-    process.exit(1);
+sequelize.sync().then(() => {
+  server.listen(PORT, async () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    
+    // Restore sessions yang sebelumnya berstatus 'connected'
+    try {
+      await restoreActiveSessions(io);
+      console.log('✅ Active sessions restored');
+    } catch (error) {
+      console.error('❌ Error restoring sessions:', error);
+    }
   });
+}).catch(err => {
+  console.error('❌ Database connection failed:', err);
+});
