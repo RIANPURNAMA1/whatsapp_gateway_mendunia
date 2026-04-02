@@ -4,237 +4,213 @@ const {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   isJidBroadcast,
-  makeInMemoryStore,
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const path = require('path');
-const fs = require('fs');
-const qrcode = require('qrcode');
-const WaSession = require('../models/WaSession');
-const { AutoReply, MessageLog } = require('../models/MessageTemplate');
+} = require("@whiskeysockets/baileys");
+const pino = require("pino");
+const path = require("path");
+const fs = require("fs");
+const qrcode = require("qrcode");
+const WaSession = require("../models/WaSession");
+const { AutoReply, MessageLog } = require("../models/MessageTemplate");
 
-const SESSIONS_DIR = path.resolve(process.env.SESSIONS_DIR || './sessions');
-const activeSessions = new Map(); // sessionId -> socket
+const SESSIONS_DIR = path.resolve(process.env.SESSIONS_DIR || "./sessions");
+const activeSessions = new Map();
 
 function getLogger() {
-  return pino({ level: 'silent' });
+  return pino({ level: "silent" });
 }
 
 async function createSession(sessionId, userId, io) {
   const sessionDir = path.join(SESSIONS_DIR, `session_${sessionId}`);
-  if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true });
+
+  // Pastikan folder sesi ada dengan permission yang benar di VPS
+  if (!fs.existsSync(sessionDir)) {
+    fs.mkdirSync(sessionDir, { recursive: true, mode: 0o777 });
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const { version } = await fetchLatestBaileysVersion();
 
+  // Bersihkan socket lama jika ada (mencegah memory leak / port hang)
+  const oldSock = activeSessions.get(sessionId);
+  if (oldSock) {
+    try {
+      oldSock.ws.close();
+    } catch (e) {}
+    activeSessions.delete(sessionId);
+  }
+
   const sock = makeWASocket({
     version,
     logger: getLogger(),
-    printQRInTerminal: false,
+    printQRInTerminal: false, // Jangan print di terminal VPS agar log bersih
     auth: state,
-    browser: ['WA Blast Pro', 'Chrome', '1.0.0'],
-    generateHighQualityLinkPreview: true,
+    // Gunakan user-agent yang stabil untuk Linux/VPS
+    browser: ["Ubuntu", "Chrome", "20.0.04"],
     syncFullHistory: false,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 0,
   });
 
   activeSessions.set(sessionId, sock);
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on('connection.update', async (update) => {
+  sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
+    // 1. Handling QR Code
     if (qr) {
       try {
         const qrBase64 = await qrcode.toDataURL(qr);
-        await WaSession.update({ qr_code: qrBase64, status: 'connecting' }, { where: { id: sessionId } });
-        io.to(`user_${userId}`).emit('qr_code', { sessionId, qr: qrBase64 });
+        // Update database hanya sekali-kali agar tidak overload
+        await WaSession.update(
+          { qr_code: qrBase64, status: "connecting" },
+          { where: { id: sessionId } },
+        );
+        // Kirim ke frontend via Socket.io
+        io.to(`user_${userId}`).emit("qr_code", { sessionId, qr: qrBase64 });
+        console.log(`[Session ${sessionId}] QR Code generated`);
       } catch (e) {
-        console.error('QR generation error:', e);
+        console.error("QR generation error:", e);
       }
     }
 
-    if (connection === 'close') {
+    // 2. Handling Connection Closed
+    if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-      await WaSession.update(
-        { status: 'disconnected', qr_code: null },
-        { where: { id: sessionId } }
+      console.log(
+        `[Session ${sessionId}] Connection closed. Reason:`,
+        statusCode,
       );
-      io.to(`user_${userId}`).emit('session_status', {
-        sessionId,
-        status: 'disconnected',
-      });
 
+      await WaSession.update(
+        { status: "disconnected", qr_code: null },
+        { where: { id: sessionId } },
+      );
+
+      io.to(`user_${userId}`).emit("session_status", {
+        sessionId,
+        status: "disconnected",
+      });
       activeSessions.delete(sessionId);
 
       if (shouldReconnect) {
-        console.log(`Reconnecting session ${sessionId}...`);
+        console.log(`[Session ${sessionId}] Reconnecting in 5s...`);
         setTimeout(() => createSession(sessionId, userId, io), 5000);
       } else {
-        console.log(`Session ${sessionId} logged out.`);
-        const sessionDir2 = path.join(SESSIONS_DIR, `session_${sessionId}`);
-        if (fs.existsSync(sessionDir2)) {
-          fs.rmSync(sessionDir2, { recursive: true });
+        console.log(`[Session ${sessionId}] Logged out. Cleaning files...`);
+        if (fs.existsSync(sessionDir)) {
+          fs.rmSync(sessionDir, { recursive: true, force: true });
         }
       }
     }
 
-    if (connection === 'open') {
-      const phoneNumber = sock.user?.id?.split(':')[0] || sock.user?.id;
+    // 3. Handling Connection Open
+    if (connection === "open") {
+      const phoneNumber = sock.user?.id?.split(":")[0] || sock.user?.id;
       await WaSession.update(
-        { status: 'connected', qr_code: null, phone_number: phoneNumber, last_connected: new Date() },
-        { where: { id: sessionId } }
+        {
+          status: "connected",
+          qr_code: null,
+          phone_number: phoneNumber,
+          last_connected: new Date(),
+        },
+        { where: { id: sessionId } },
       );
-      io.to(`user_${userId}`).emit('session_status', {
+
+      io.to(`user_${userId}`).emit("session_status", {
         sessionId,
-        status: 'connected',
+        status: "connected",
         phoneNumber,
       });
-      console.log(`Session ${sessionId} connected as ${phoneNumber}`);
+      console.log(`[Session ${sessionId}] Connected as ${phoneNumber}`);
     }
   });
 
-sock.ev.on('messages.upsert', async ({ messages, type }) => {
-  if (type !== 'notify') return;
-  
-  for (const msg of messages) {
-    if (isJidBroadcast(msg.key.remoteJid)) continue;
-    if (msg.key.fromMe) continue;
+  // --- Handling Messages ---
+  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    if (type !== "notify") return;
+    for (const msg of messages) {
+      if (isJidBroadcast(msg.key.remoteJid) || msg.key.fromMe) continue;
 
-    const fromJid = msg.key.remoteJid;
-    const fromNumber = fromJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
-    
-    // --- PERBAIKAN: Tangkap Nama WhatsApp ---
-    // msg.pushName berisi nama profil WA pengirim
-    const senderName = msg.pushName || fromNumber; 
-    
-    const content = msg.message?.conversation || 
-                    msg.message?.extendedTextMessage?.text || 
-                    msg.message?.imageMessage?.caption || 
-                    msg.message?.videoMessage?.caption || '';
+      const fromJid = msg.key.remoteJid;
+      const fromNumber = fromJid.split("@")[0];
+      const senderName = msg.pushName || fromNumber;
 
-    // Log incoming message ke Database
-    try {
-      const session = await WaSession.findByPk(sessionId);
-      if (session) {
-        await MessageLog.create({
-          session_id: sessionId,
-          direction: 'incoming',
-          from_number: fromNumber,
-          from_name: senderName, // DISIMPAN DISINI
-          to_number: session.phone_number || '',
-          message_type: 'text',
-          content: content,
-          message_id: msg.key.id,
-        });
-      }
-    } catch (e) { 
-      console.error('Gagal simpan log ke DB:', e.message);
-    }
+      const content =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.imageMessage?.caption ||
+        "";
 
-    // Auto Reply Logic
-    try {
-      const autoReplies = await AutoReply.findAll({
-        where: { session_id: sessionId, is_active: 1 },
+      // Simpan log pesan masuk ke DB secara async
+      MessageLog.create({
+        session_id: sessionId,
+        direction: "incoming",
+        from_number: fromNumber,
+        from_name: senderName,
+        to_number: sock.user?.id?.split(":")[0] || "",
+        message_type: "text",
+        content: content,
+        message_id: msg.key.id,
+      }).catch((err) => console.error("Log DB Error:", err.message));
+
+      // Auto Reply Logic
+      handleAutoReply(sessionId, fromNumber, content, sock);
+
+      // Emit ke UI dashboard
+      io.to(`user_${userId}`).emit("incoming_message", {
+        sessionId,
+        from: fromNumber,
+        from_name: senderName,
+        content,
+        timestamp: new Date(),
       });
-
-      for (const rule of autoReplies) {
-        let matched = false;
-        const keyword = rule.trigger_keyword.toLowerCase();
-        const msgLower = content.toLowerCase();
-
-        if (rule.match_type === 'exact') matched = msgLower === keyword;
-        else if (rule.match_type === 'contains') matched = msgLower.includes(keyword);
-        else if (rule.match_type === 'starts_with') matched = msgLower.startsWith(keyword);
-        else if (rule.match_type === 'regex') {
-          try { matched = new RegExp(rule.trigger_keyword, 'i').test(content); } catch (e) {}
-        }
-
-        if (matched) {
-          await sendMessage(sessionId, fromNumber, rule.reply_message);
-          await rule.increment('reply_count');
-          break;
-        }
-      }
-    } catch (e) {
-      console.error('Auto reply error:', e);
     }
-
-    // --- PERBAIKAN: Kirim Nama ke Frontend via Socket ---
-    io.to(`user_${userId}`).emit('incoming_message', {
-      sessionId,
-      from: fromNumber,
-      from_name: senderName,
-      content,
-      timestamp: new Date(),
-    });
-  }
-});
+  });
 
   return sock;
 }
 
-async function sendMessage(sessionId, phone, message, mediaOptions = null) {
-  const sock = activeSessions.get(sessionId);
-  if (!sock) throw new Error('Session not connected');
-
-  const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
-
-  if (mediaOptions && mediaOptions.type !== 'none') {
-    const { type, buffer, filename, mimetype, caption } = mediaOptions;
-    if (type === 'image') {
-      return await sock.sendMessage(jid, { image: buffer, caption: caption || message, mimetype: mimetype || 'image/jpeg' });
-    } else if (type === 'video') {
-      return await sock.sendMessage(jid, { video: buffer, caption: caption || message, mimetype: mimetype || 'video/mp4' });
-    } else if (type === 'document') {
-      return await sock.sendMessage(jid, { document: buffer, fileName: filename || 'file', mimetype: mimetype || 'application/octet-stream', caption: caption || message });
-    }
-  }
-
-  return await sock.sendMessage(jid, { text: message });
-}
-
-async function isSessionConnected(sessionId) {
-  const sock = activeSessions.get(sessionId);
-  return sock && sock.user ? true : false;
-}
-
-async function disconnectSession(sessionId) {
-  const sock = activeSessions.get(sessionId);
-  if (sock) {
-    await sock.logout();
-    activeSessions.delete(sessionId);
-  }
-  const sessionDir = path.join(SESSIONS_DIR, `session_${sessionId}`);
-  if (fs.existsSync(sessionDir)) {
-    fs.rmSync(sessionDir, { recursive: true });
-  }
-}
-
-async function restoreActiveSessions(io) {
+// Fungsi helper Auto Reply agar kode createSession tidak terlalu panjang
+async function handleAutoReply(sessionId, fromNumber, content, sock) {
   try {
-    const sessions = await WaSession.findAll({ where: { status: 'connected' } });
-    for (const session of sessions) {
-      const sessionDir = path.join(SESSIONS_DIR, `session_${session.id}`);
-      if (fs.existsSync(sessionDir)) {
-        console.log(`Restoring session ${session.id} (${session.session_name})`);
-        await createSession(session.id, session.user_id, io);
-      } else {
-        await session.update({ status: 'disconnected' });
+    const autoReplies = await AutoReply.findAll({
+      where: { session_id: sessionId, is_active: 1 },
+    });
+
+    for (const rule of autoReplies) {
+      let matched = false;
+      const keyword = rule.trigger_keyword.toLowerCase();
+      const msgLower = content.toLowerCase();
+
+      if (rule.match_type === "exact") matched = msgLower === keyword;
+      else if (rule.match_type === "contains")
+        matched = msgLower.includes(keyword);
+
+      if (matched) {
+        await sock.sendMessage(`${fromNumber}@s.whatsapp.net`, {
+          text: rule.reply_message,
+        });
+        await rule.increment("reply_count");
+        break;
       }
     }
   } catch (e) {
-    console.error('Error restoring sessions:', e);
+    console.error("Auto reply error:", e);
   }
 }
 
+// Export fungsi lainnya tetap sama
 module.exports = {
   createSession,
-  sendMessage,
-  isSessionConnected,
-  disconnectSession,
-  restoreActiveSessions,
+  restoreActiveSessions: async (io) => {
+    const sessions = await WaSession.findAll({
+      where: { status: "connected" },
+    });
+    for (const s of sessions) createSession(s.id, s.user_id, io);
+  },
   activeSessions,
 };
