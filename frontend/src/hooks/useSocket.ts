@@ -4,6 +4,10 @@ import { useAuthStore } from '../store/authStore'
 
 let socketInstance: Socket | null = null
 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 
+                   import.meta.env.VITE_API_URL?.replace('/api', '') || 
+                   'http://localhost:3001'
+
 export function useSocket() {
   const { user } = useAuthStore()
   const socketRef = useRef<Socket | null>(null)
@@ -12,10 +16,18 @@ export function useSocket() {
     if (!user) return
 
     if (!socketInstance) {
-      socketInstance = io('http://localhost:3001', {
-        transports: ['websocket'],
+      socketInstance = io(SOCKET_URL, {
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
+      })
+      
+      socketInstance.on('connect', () => {
+        console.log('Socket connected to:', SOCKET_URL)
+      })
+      
+      socketInstance.on('connect_error', (error) => {
+        console.error('Socket connection error:', error.message)
       })
     }
 

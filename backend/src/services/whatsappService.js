@@ -19,6 +19,7 @@ function getLogger() {
   return pino({ level: "silent" });
 }
 
+
 async function createSession(sessionId, userId, io) {
   const sessionDir = path.join(SESSIONS_DIR, `session_${sessionId}`);
 
